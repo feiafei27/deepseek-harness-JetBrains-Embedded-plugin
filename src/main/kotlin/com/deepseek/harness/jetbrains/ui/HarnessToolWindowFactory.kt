@@ -8,7 +8,7 @@ import com.intellij.ui.content.ContentFactory
 class HarnessToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val panel = HarnessToolWindowPanel(project)
+        val panel = HarnessToolWindowPanel()
         val content = ContentFactory.getInstance().createContent(panel, "", false)
         content.setDisposer(panel)
         toolWindow.contentManager.addContent(content)

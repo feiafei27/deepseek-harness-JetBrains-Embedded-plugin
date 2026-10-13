@@ -161,4 +161,4 @@ src/main/resources/
 
 ## 许可
 
-见仓库 LICENSE（如未附带，请按仓库默认约定）。
+本项目采用[木兰宽松许可证，第 2 版](LICENSE)（Mulan PSL v2）授权，许可证全文见仓库根目录的 [`LICENSE`](LICENSE)。

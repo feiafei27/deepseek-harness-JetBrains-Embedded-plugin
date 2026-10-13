@@ -48,4 +48,11 @@ intellijPlatform {
             sinceBuild = "253"
         }
     }
+
+    publishing {
+        // JetBrains Marketplace 个人访问令牌（在 plugins.jetbrains.com/author/me/tokens 生成）。
+        // 默认留空，发布时通过 -PintellijPlatformPublishingToken=perm:xxx 或环境变量
+        // ORG_GRADLE_PROJECT_intellijPlatformPublishingToken 传入，避免把令牌写进仓库。
+        token = providers.gradleProperty("intellijPlatformPublishingToken")
+    }
 }

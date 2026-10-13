@@ -162,4 +162,4 @@ Design and implementation documents live in [`docs/superpowers/`](docs/superpowe
 
 ## License
 
-See the repository LICENSE (if none is bundled, follow the repository default).
+Released under the [Mulan Permissive Software License, Version 2](LICENSE) (Mulan PSL v2). The full text is in [`LICENSE`](LICENSE) at the repository root.

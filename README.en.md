@@ -37,12 +37,11 @@ So I wrote this one. Its logic is **deliberately minimal**: it does exactly thre
 
 ### From the plugin marketplace
 
-Search for it under `Settings → Plugins → Marketplace`.
+Search for **DeepSeek Harness Embedded** under `Settings → Plugins → Marketplace`.
 
 ### From disk
 
-1. Build the zip (see "Building from source" below), or use the prebuilt
-   `build/distributions/deepseek-harness-jetbrains-embedded-plugin-0.1.0.zip`.
+1. Build the zip first (see "Building from source" below).
 2. `Settings → Plugins → gear icon ⚙ → Install Plugin from Disk…` and pick that zip.
 3. **Restart the IDE.**
 

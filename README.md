@@ -37,11 +37,11 @@
 
 ### 方式一：插件市场
 
-在 `设置 → 插件 → Marketplace` 里搜索安装。
+在 `设置 → 插件 → Marketplace` 里搜索 **DeepSeek Harness Embedded** 安装。
 
 ### 方式二：从磁盘安装
 
-1. 构建出 zip（见下方「从源码构建」），或直接使用 `build/distributions/deepseek-harness-jetbrains-embedded-plugin-0.1.0.zip`。
+1. 先按下方「从源码构建」生成 zip。
 2. `设置 → 插件 → 齿轮 ⚙ → 从磁盘安装插件…`，选中该 zip。
 3. **重启 IDE。**
 

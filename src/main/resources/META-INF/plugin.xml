@@ -15,7 +15,7 @@ its menu "应用 → 管理 dsh 命令…".
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="DeepSeek Harness"
                     anchor="right"
-                    icon="/icons/deepseek-13.png"
+                    icon="/icons/deepseek.svg"
                     factoryClass="com.deepseek.harness.jetbrains.ui.HarnessToolWindowFactory"/>
     </extensions>
 </idea-plugin>

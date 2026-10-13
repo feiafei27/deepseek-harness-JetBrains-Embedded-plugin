@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.deepseek.harness.jetbrains</id>
-    <name>DeepSeek Harness</name>
-    <vendor>DeepSeek Harness Community</vendor>
+    <name>DeepSeek Harness Embedded</name>
+    <vendor>fufei</vendor>
     <description><![CDATA[
 Use the locally installed DeepSeek Harness right inside JetBrains IDEs.<br/>
 在 JetBrains IDE 内直接使用本机已安装的 DeepSeek Harness：点击侧边栏的 DeepSeek 图标打开窗口后，
@@ -13,6 +13,11 @@ its menu "应用 → 管理 dsh 命令…".
     ]]></description>
     <depends>com.intellij.modules.platform</depends>
     <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.deepseek.harness.jetbrains.settings.DshSettings"/>
+        <applicationConfigurable groupId="tools"
+                                 id="com.deepseek.harness.jetbrains.settings"
+                                 displayName="DeepSeek Harness Embedded"
+                                 instance="com.deepseek.harness.jetbrains.settings.DshSettingsConfigurable"/>
         <toolWindow id="DeepSeek Harness"
                     anchor="right"
                     icon="/icons/deepseek.svg"

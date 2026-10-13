@@ -13,4 +13,9 @@ class HarnessToolWindowFactory : ToolWindowFactory {
         content.setDisposer(panel)
         toolWindow.contentManager.addContent(content)
     }
+
+    companion object {
+        /** 与 plugin.xml 中 `<toolWindow id="...">` 保持一致。 */
+        const val TOOL_WINDOW_ID = "DeepSeek Harness"
+    }
 }

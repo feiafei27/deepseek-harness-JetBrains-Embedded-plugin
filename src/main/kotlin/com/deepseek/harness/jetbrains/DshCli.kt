@@ -43,22 +43,12 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
             return DetectResult.Unavailable("无法执行检测命令：${e.message}")
         }
 
-        // 必须"先等结束、再读输出"：先读会在进程挂住时永久阻塞。
-        // dsh --version 的输出极小，不会撑满管道缓冲区，所以这个顺序是安全的。
-        val finished = try {
-            proc.waitFor(DETECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        } catch (e: InterruptedException) {
-            Thread.currentThread().interrupt()
-            proc.destroyForcibly()
-            return DetectResult.Unavailable("检测被中断")
-        }
-        if (!finished) {
-            proc.destroyForcibly()
+        val (exitCode, output) = waitForExit(proc, DETECT_TIMEOUT_SECONDS)
+        if (exitCode == null) {
+            killTree(proc)
             return DetectResult.Unavailable("执行 $DETECT_COMMAND 超过 $DETECT_TIMEOUT_SECONDS 秒未结束")
         }
 
-        val output = proc.inputStream.bufferedReader(StandardCharsets.UTF_8).readText()
-        val exitCode = proc.exitValue()
         val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
         log(LogLevel.INFO, "检测结束：退出码=$exitCode 耗时=${elapsedMs}ms")
         output.lineSequence().forEach { log(LogLevel.INFO, "dsh --version: $it") }
@@ -126,43 +116,97 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
         reader.isDaemon = true
         reader.start()
 
-        return try {
-            val url = urlFuture.get(URL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            log(LogLevel.INFO, "捕获到 Harness 地址：$url")
-            StartResult.Started(url, port)
+        var failure = "dsh web 启动失败"
+        val url = try {
+            urlFuture.get(URL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } catch (e: TimeoutException) {
-            StartResult.Failed("$URL_TIMEOUT_SECONDS 秒内未打印出 dsh web 地址")
+            failure = "$URL_TIMEOUT_SECONDS 秒内未打印出 dsh web 地址"
+            null
         } catch (e: ExecutionException) {
-            StartResult.Failed(e.cause?.message ?: "dsh web 启动失败")
+            failure = e.cause?.message ?: failure
+            null
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
-            StartResult.Failed("等待 dsh web 地址时被中断")
+            failure = "等待 dsh web 地址时被中断"
+            null
         }
+
+        if (url == null) {
+            // 启动失败还留着进程会白占端口，且下次刷新会再起一个，所以这里直接清理掉。
+            killTree(proc)
+            process = null
+            log(LogLevel.ERROR, "启动 Harness 服务失败：$failure")
+            return StartResult.Failed(failure)
+        }
+
+        log(LogLevel.INFO, "捕获到 Harness 地址：$url")
+        return StartResult.Started(url, port)
     }
 
-    /**
-     * 结束 [startWeb] 拉起的进程树。
-     *
-     * `cmd.exe /c dsh web ...` 会产生 cmd.exe → DeepSeek Harness.exe 两层以上进程，
-     * 只 destroy() cmd.exe 会让子进程变成孤儿继续占用端口，所以必须用 taskkill /T。
-     */
+    /** 结束 [startWeb] 拉起的进程树。 */
     fun stop() {
         val proc = process ?: return
         process = null
+        killTree(proc)
+    }
 
+    /**
+     * 并发读取子进程输出，并按超时等待它结束。返回 (退出码, 输出)，退出码为 null 表示没等到结束。
+     *
+     * 必须"边读边等"，不能"先 waitFor 再读输出"：实测（JDK 24 / Windows 11 / `cmd.exe /c dsh --version`）
+     * 当 stdout 是无人读取的管道时，子进程根本不退出，`waitFor` 会一路耗到超时仍拿不到退出码；
+     * 加上并发读取后 382ms 就正常结束（该命令总共只输出 11 字节，与管道缓冲区大小无关）。
+     */
+    private fun waitForExit(proc: Process, timeoutSeconds: Long): Pair<Int?, String> {
+        val outputFuture = CompletableFuture<String>()
+        val reader = Thread({
+            try {
+                outputFuture.complete(proc.inputStream.bufferedReader(StandardCharsets.UTF_8).readText())
+            } catch (e: Exception) {
+                outputFuture.completeExceptionally(e)
+            }
+        }, "process-output-reader")
+        reader.isDaemon = true
+        reader.start()
+
+        val finished = try {
+            proc.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            log(LogLevel.WARN, "等待进程结束时被中断")
+            return null to ""
+        }
+
+        val output = try {
+            outputFuture.get(timeoutSeconds, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            ""
+        } catch (e: Exception) {
+            log(LogLevel.WARN, "读取进程输出失败：$e")
+            ""
+        }
+        return (if (finished) proc.exitValue() else null) to output
+    }
+
+    /**
+     * 用 taskkill /F /T 结束整棵进程树。
+     *
+     * `cmd.exe /c dsh web ...` 会产生 cmd.exe → DeepSeek Harness.exe 两层以上进程（实测 taskkill
+     * 报告终止了一个子进程），只 destroy() 最外层会留下孤儿进程继续占用端口，所以必须带 /T。
+     */
+    private fun killTree(proc: Process) {
         if (!proc.isAlive) {
-            log(LogLevel.INFO, "dsh web 进程已自行结束，退出码 ${runCatching { proc.exitValue() }.getOrNull()}")
+            log(LogLevel.INFO, "进程已自行结束，退出码 ${runCatching { proc.exitValue() }.getOrNull()}，无需 taskkill")
             return
         }
 
         val command = listOf("taskkill", "/F", "/T", "/PID", proc.pid().toString())
-        log(LogLevel.INFO, "停止 dsh web：${command.joinToString(" ")}")
+        log(LogLevel.INFO, "结束进程树：${command.joinToString(" ")}")
         try {
             val killer = ProcessBuilder(command).redirectErrorStream(true).start()
-            val output = killer.inputStream.bufferedReader(StandardCharsets.UTF_8).readText()
-            val finished = killer.waitFor(KILL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            val exitCode = if (finished) killer.exitValue() else null
-            val level = if (finished && exitCode == 0) LogLevel.INFO else LogLevel.WARN
+            val (exitCode, output) = waitForExit(killer, KILL_TIMEOUT_SECONDS)
+            val level = if (exitCode == 0) LogLevel.INFO else LogLevel.WARN
             log(level, "taskkill 退出码=$exitCode 输出=${output.trim()}")
         } catch (e: Exception) {
             log(LogLevel.WARN, "taskkill 执行失败：${e.message}")

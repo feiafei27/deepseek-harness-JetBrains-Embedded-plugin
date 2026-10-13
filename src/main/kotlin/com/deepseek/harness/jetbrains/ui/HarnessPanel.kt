@@ -72,10 +72,7 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
     /** 已在后台线程中被调用。 */
     private fun startService() {
         when (val result = dsh.startWeb()) {
-            is DshCli.StartResult.Failed -> {
-                log(LogLevel.ERROR, "启动 Harness 服务失败：${result.reason}")
-                onEdt { showError(result.reason) }
-            }
+            is DshCli.StartResult.Failed -> onEdt { showError(result.reason) }
             is DshCli.StartResult.Started -> {
                 currentUrl = result.url
                 onEdt { showBrowser(result.url) }

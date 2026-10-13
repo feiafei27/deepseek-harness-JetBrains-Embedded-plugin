@@ -4,6 +4,8 @@
 
 Use the **DeepSeek Harness** already installed on your machine right inside a JetBrains IDE: click the sidebar icon and the full Harness UI opens in a tool window.
 
+![DeepSeek Harness Embedded in the IDE](docs/images/README-IMG1.png)
+
 ---
 
 ## Why I wrote this plugin
@@ -12,15 +14,7 @@ I tried the DeepSeek Harness plugins available in the plugin marketplace, and th
 
 So I wrote this one. Its logic is **deliberately minimal**: it does exactly three things — detect the `dsh` command, start the local Harness server, and embed that address in the IDE. It does not parse protocols, manage models, or touch your login state. Fewer moving parts means fewer ways to fail, which makes it more usable in practice.
 
-## What you get
-
-- **Perfectly unified with your system-installed DeepSeek Harness.** The plugin reuses the copy of Harness you already have, so **there is no second configuration**: models, login state, session history and working directory are exactly the ones in your desktop app. It is the same environment from the first click.
-- **Nothing to configure inside the plugin.** No path, no port, no token — the plugin starts the server itself and captures the address (token included). If a port is taken, it moves on to the next one.
-- **Simple to use.** Install it, click the sidebar icon. No terminal, no typing `dsh web` yourself.
-- **Clean.** One `dsh` process per project window, and the whole process tree is terminated with `taskkill /F /T` when the window is released — no orphaned processes, no ports left occupied.
-- **Built-in debug log.** The "日志" (Log) tab prints every command executed, its exit code, timings, the raw command output, and the final URL.
-
-## Prerequisites
+## Prerequisites (read this first)
 
 1. **The DeepSeek Harness desktop app is installed**, and has been launched at least once.
 2. **The `dsh` CLI is installed and on your `PATH`.**
@@ -30,6 +24,14 @@ So I wrote this one. Its logic is **deliberately minimal**: it does exactly thre
 
 > **Mind the `PATH`.** The plugin invokes `cmd.exe /c dsh ...`, which inherits the environment of the IDE process.
 > If you installed `dsh` **after** starting your IDE, the IDE cannot see the new `PATH` — **restart the IDE once**.
+
+## What you get
+
+- **Perfectly unified with your system-installed DeepSeek Harness.** The plugin reuses the copy of Harness you already have, so **there is no second configuration**: models, login state, session history and working directory are exactly the ones in your desktop app. It is the same environment from the first click.
+- **Nothing to configure inside the plugin.** No path, no port, no token — the plugin starts the server itself and captures the address (token included). If a port is taken, it moves on to the next one.
+- **Simple to use.** Install it, click the sidebar icon. No terminal, no typing `dsh web` yourself.
+- **Clean.** One `dsh` process per project window, and the whole process tree is terminated with `taskkill /F /T` when the window is released — no orphaned processes, no ports left occupied.
+- **Built-in debug log.** The "日志" (Log) tab prints every command executed, its exit code, timings, the raw command output, and the final URL.
 
 ## Installation
 
@@ -46,7 +48,7 @@ Search for it under `Settings → Plugins → Marketplace`.
 
 ## Usage
 
-1. After the restart, a **DeepSeek Harness** icon appears on the right sidebar (the blue whale among the vertical buttons).
+1. After the restart, a **DeepSeek Harness** icon appears on the right sidebar (the whale among the vertical buttons; its color follows the IDE theme).
 2. Click it. The window has two tabs:
 
    - **Harness** — the main view. The plugin detects `dsh`, starts the local server, and embeds the Harness UI here.
@@ -55,6 +57,14 @@ Search for it under `Settings → Plugins → Marketplace`.
 3. If no usable `dsh` is found, the Harness tab shows installation instructions and the hint
    "dsh 命令完成后，点击下方刷新按钮" (once the dsh command is ready, click the refresh button below).
    Install `dsh` as instructed, then click **刷新 (Refresh)** — no IDE restart needed.
+
+## Settings
+
+Path: `Settings → Tools → DeepSeek Harness Embedded`.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| Render the "Harness" and "日志" (Log) tabs above the tool window | On | When checked, the two tabs are shown above the tool window so you can switch between the main view and the debug log. When unchecked the tab bar is not rendered and only the Harness view is shown, giving the tab bar's height back to the content area — useful on short screens or when you do not need the log inside the IDE. The log is still written to the IDE's `idea.log`. Changes take effect immediately, with no IDE restart. |
 
 ## How it works
 

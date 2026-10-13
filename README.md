@@ -37,7 +37,7 @@
 
 ### 方式一：插件市场
 
-在 `设置 → 插件 → Marketplace` 里搜索 **DeepSeek Harness Embedded** 安装。
+在 `设置 → 插件 → Marketplace` 里搜索 **DeepSeek Harness Embedded** 安装，或访问插件主页：<https://plugins.jetbrains.com/plugin/35056-deepseek-harness-embedded>。
 
 ### 方式二：从磁盘安装
 

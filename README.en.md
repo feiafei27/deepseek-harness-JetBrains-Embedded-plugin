@@ -37,7 +37,7 @@ So I wrote this one. Its logic is **deliberately minimal**: it does exactly thre
 
 ### From the plugin marketplace
 
-Search for **DeepSeek Harness Embedded** under `Settings → Plugins → Marketplace`.
+Search for **DeepSeek Harness Embedded** under `Settings → Plugins → Marketplace`, or open the plugin page: <https://plugins.jetbrains.com/plugin/35056-deepseek-harness-embedded>.
 
 ### From disk
 

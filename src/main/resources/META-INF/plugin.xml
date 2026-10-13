@@ -1,0 +1,7 @@
+<idea-plugin>
+    <id>com.deepseek.harness.jetbrains</id>
+    <name>DeepSeek Harness</name>
+    <vendor>DeepSeek Harness Community</vendor>
+    <description><![CDATA[在 JetBrains IDE 内嵌使用本机已安装的 DeepSeek Harness。]]></description>
+    <depends>com.intellij.modules.platform</depends>
+</idea-plugin>

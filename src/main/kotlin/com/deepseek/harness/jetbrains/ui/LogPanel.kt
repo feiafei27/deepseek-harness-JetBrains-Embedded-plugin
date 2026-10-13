@@ -22,7 +22,10 @@ class LogPanel : JPanel(BorderLayout()) {
         area.isEditable = false
         area.lineWrap = true
         area.wrapStyleWord = false
-        area.font = JBUI.Fonts.create("JetBrains Mono", 12)
+        // 必须用逻辑字体族 "Monospaced"：逻辑字体族是复合字体，缺字时会回退到系统中文字体。
+        // 实测（Java 24 / Windows 11）：物理字体族如 "Segoe UI" 的 canDisplay('中') == false，
+        // 而 JetBrains IDE 会把 JetBrains Mono 注册成物理字体，此前用它导致中文全渲染成方块。
+        area.font = JBUI.Fonts.create("Monospaced", 12)
         add(JBScrollPane(area), BorderLayout.CENTER)
         border = JBUI.Borders.empty(6)
     }

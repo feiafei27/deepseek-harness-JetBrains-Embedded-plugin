@@ -3,6 +3,7 @@ package com.deepseek.harness.jetbrains
 import java.io.File
 import java.io.IOException
 import java.net.ServerSocket
+import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
@@ -161,7 +162,7 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
         val outputFuture = CompletableFuture<String>()
         val reader = Thread({
             try {
-                outputFuture.complete(proc.inputStream.bufferedReader(StandardCharsets.UTF_8).readText())
+                outputFuture.complete(decodeProcessOutput(proc.inputStream.readBytes()))
             } catch (e: Exception) {
                 outputFuture.completeExceptionally(e)
             }
@@ -187,6 +188,16 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
             ""
         }
         return (if (finished) proc.exitValue() else null) to output
+    }
+
+    /**
+     * 子进程输出有两种可能的编码：dsh（Node/Electron）输出 UTF-8，而 cmd.exe 自己的输出
+     * （taskkill 的结果、`dsh 不是内部或外部命令` 这类报错）用的是系统 ANSI 代码页，
+     * 中文 Windows 上是 GBK。先按 UTF-8 解，只有解出替换字符 U+FFFD 时才回退到系统代码页。
+     */
+    private fun decodeProcessOutput(bytes: ByteArray): String {
+        val utf8 = String(bytes, StandardCharsets.UTF_8)
+        return if (utf8.contains('\uFFFD')) String(bytes, CONSOLE_CHARSET) else utf8
     }
 
     /**
@@ -233,5 +244,11 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
         private const val KILL_TIMEOUT_SECONDS = 5L
         private val PORT_RANGE = 3080..3100
         private val URL_PATTERN = Regex("""^\s*dsh web:\s*(http://\S+)""")
+
+        // 系统 ANSI 代码页：Java 18+ 起 file.encoding 被固定为 UTF-8，
+        // 但 sun.jnu.encoding 仍然是系统的本地编码，用它来解 cmd.exe 的输出。
+        private val CONSOLE_CHARSET: Charset =
+            runCatching { Charset.forName(System.getProperty("sun.jnu.encoding")) }
+                .getOrDefault(StandardCharsets.UTF_8)
     }
 }

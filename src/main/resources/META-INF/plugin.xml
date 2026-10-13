@@ -4,4 +4,10 @@
     <vendor>DeepSeek Harness Community</vendor>
     <description><![CDATA[在 JetBrains IDE 内嵌使用本机已安装的 DeepSeek Harness。]]></description>
     <depends>com.intellij.modules.platform</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="DeepSeek Harness"
+                    anchor="right"
+                    icon="/icons/deepseek-13.png"
+                    factoryClass="com.deepseek.harness.jetbrains.ui.HarnessToolWindowFactory"/>
+    </extensions>
 </idea-plugin>

@@ -1,3 +1,5 @@
+.superpowers/
+.intellijPlatform/
 .gradle/
 build/
 .kotlin/

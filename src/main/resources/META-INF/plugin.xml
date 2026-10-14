@@ -11,6 +11,15 @@ Prerequisite: the DeepSeek Harness desktop app must be installed
 (<a href="https://harness.deepseek.com">https://harness.deepseek.com</a>), and the dsh CLI must be installed from
 its menu "应用 → 管理 dsh 命令…".
     ]]></description>
+    <change-notes><![CDATA[
+新增<br/>
+<ul>
+    <li>工具窗口标题栏新增「刷新」按钮（在「更多（…）」按钮左侧）：点击后先关闭本窗口的 dsh 服务，再重新检测、启动，
+        并用新地址重新加载内嵌页面，不需要重启 IDE。</li>
+    <li>启动检测界面改为分步进度清单：关闭旧服务 / 检测 dsh 命令 / 选择可用端口 / 启动 dsh web 服务 /
+        等待服务输出地址 / 加载 Harness 界面，逐步点亮；等待服务地址时显示已等待秒数。</li>
+</ul>
+    ]]></change-notes>
     <depends>com.intellij.modules.platform</depends>
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="com.deepseek.harness.jetbrains.settings.DshSettings"/>

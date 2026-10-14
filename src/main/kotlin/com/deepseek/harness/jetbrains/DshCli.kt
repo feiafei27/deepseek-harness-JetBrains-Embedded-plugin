@@ -31,8 +31,6 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
     @Volatile
     private var process: Process? = null
 
-    fun isRunning(): Boolean = process?.isAlive == true
-
     fun detect(): DetectResult {
         val startedAt = System.nanoTime()
         val command = listOf("cmd.exe", "/c", DETECT_COMMAND)

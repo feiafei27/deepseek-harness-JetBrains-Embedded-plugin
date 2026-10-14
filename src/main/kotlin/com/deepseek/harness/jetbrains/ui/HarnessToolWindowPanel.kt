@@ -47,6 +47,11 @@ class HarnessToolWindowPanel : JPanel(BorderLayout()), Disposable {
         logPanel.append(LogLevel.INFO, if (renderTabs) "已渲染页签栏" else "已隐藏页签栏，只显示 Harness 主界面")
     }
 
+    /** 供工具窗口标题栏的刷新按钮调用：关闭本窗口的 dsh 服务并重跑一次启动流程。 */
+    fun restartHarness() {
+        harnessPanel.restart()
+    }
+
     override fun dispose() {
         harnessPanel.dispose()
         logPanel.append(LogLevel.INFO, "工具窗口已释放")

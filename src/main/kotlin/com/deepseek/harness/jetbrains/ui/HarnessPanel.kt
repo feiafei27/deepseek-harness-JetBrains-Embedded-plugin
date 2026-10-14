@@ -35,7 +35,6 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
     private val errorReason = JLabel()
 
     private var browser: JBCefBrowser? = null
-    private var currentUrl: String? = null
 
     init {
         add(buildCheckingCard(), Card.CHECKING.name)
@@ -53,18 +52,35 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
 
     // ---- 状态机 ----
 
+    /** 必须在 EDT 调用。 */
     private fun start() {
         showChecking()
+        ApplicationManager.getApplication().executeOnPooledThread { detectAndStart() }
+    }
+
+    /**
+     * 标题栏的刷新按钮与卡片内的「刷新」按钮共用：先关掉现有 dsh 服务，再完整重跑一次启动流程，
+     * 用新抓到的地址重新加载页面。必须在 EDT 调用。
+     */
+    fun restart() {
+        log(LogLevel.INFO, "手动刷新：先关闭 dsh 服务，再重新执行启动流程")
+        showChecking()
         ApplicationManager.getApplication().executeOnPooledThread {
-            when (val result = dsh.detect()) {
-                is DshCli.DetectResult.Unavailable -> {
-                    log(LogLevel.WARN, "未检测到可用的 dsh 命令：${result.reason}")
-                    onEdt { showGuide() }
-                }
-                is DshCli.DetectResult.Available -> {
-                    log(LogLevel.INFO, "dsh 命令可用，版本：${result.version}")
-                    startService()
-                }
+            dsh.stop()
+            detectAndStart()
+        }
+    }
+
+    /** 已在后台线程中被调用。 */
+    private fun detectAndStart() {
+        when (val result = dsh.detect()) {
+            is DshCli.DetectResult.Unavailable -> {
+                log(LogLevel.WARN, "未检测到可用的 dsh 命令：${result.reason}")
+                onEdt { showGuide() }
+            }
+            is DshCli.DetectResult.Available -> {
+                log(LogLevel.INFO, "dsh 命令可用，版本：${result.version}")
+                startService()
             }
         }
     }
@@ -73,21 +89,8 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
     private fun startService() {
         when (val result = dsh.startWeb()) {
             is DshCli.StartResult.Failed -> onEdt { showError(result.reason) }
-            is DshCli.StartResult.Started -> {
-                currentUrl = result.url
-                onEdt { showBrowser(result.url) }
-            }
+            is DshCli.StartResult.Started -> onEdt { showBrowser(result.url) }
         }
-    }
-
-    private fun refresh() {
-        val url = currentUrl
-        if (dsh.isRunning() && url != null) {
-            log(LogLevel.INFO, "已有存活的 dsh web 进程，复用它，不重新检测")
-            showBrowser(url)
-            return
-        }
-        start()
     }
 
     private fun showChecking() {
@@ -165,7 +168,7 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
 
     private fun buildGuideCard(): JPanel {
         val refreshButton = JButton("刷新")
-        refreshButton.addActionListener { refresh() }
+        refreshButton.addActionListener { restart() }
         refreshButtons.add(refreshButton)
 
         return stack(
@@ -187,7 +190,7 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
 
     private fun buildErrorCard(): JPanel {
         val refreshButton = JButton("刷新")
-        refreshButton.addActionListener { refresh() }
+        refreshButton.addActionListener { restart() }
         refreshButtons.add(refreshButton)
 
         val reason = JPanel(BorderLayout()).apply {

@@ -2,22 +2,27 @@ package com.deepseek.harness.jetbrains.ui
 
 import com.deepseek.harness.jetbrains.DshCli
 import com.deepseek.harness.jetbrains.LogLevel
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import org.cef.browser.CefBrowser
 import org.cef.handler.CefLoadHandlerAdapter
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Component
+import java.awt.Dimension
+import java.awt.Font
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.Timer
 
 /**
  * Harness tab：四态卡片。
@@ -29,12 +34,28 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
 
     private enum class Card { CHECKING, GUIDE, BROWSER, ERROR }
 
-    private val dsh = DshCli(log)
+    private val dsh = DshCli(log, ::onStage)
     private val refreshButtons = mutableListOf<JButton>()
     private val browserHolder = JPanel(BorderLayout())
     private val errorReason = JLabel()
 
     private var browser: JBCefBrowser? = null
+
+    /** CHECKING 卡片的步骤清单容器，每次启动流程重建内容。 */
+    private val stepsBox = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.Y_AXIS)
+        border = JBUI.Borders.empty(16)
+    }
+
+    private val stepRows = LinkedHashMap<DshCli.Stage, StepRow>()
+    private var runningStage: DshCli.Stage? = null
+    private var runningSince = 0L
+
+    /** 只给"等待服务输出地址"走秒表：它是唯一会久等、且不阻塞 EDT 的阶段。 */
+    private val stepTimer = Timer(1000) {
+        val stage = runningStage ?: return@Timer
+        stepRows[stage]?.update(StepState.RUNNING, elapsedSeconds())
+    }
 
     init {
         add(buildCheckingCard(), Card.CHECKING.name)
@@ -45,6 +66,8 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
     }
 
     override fun dispose() {
+        // Swing Timer 会一直持有监听器（进而持有本面板），不停掉就是泄漏。
+        stepTimer.stop()
         dsh.stop()
         browser?.dispose()
         browser = null
@@ -54,6 +77,7 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
 
     /** 必须在 EDT 调用。 */
     private fun start() {
+        prepareSteps(withStop = false)
         showChecking()
         ApplicationManager.getApplication().executeOnPooledThread { detectAndStart() }
     }
@@ -64,6 +88,7 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
      */
     fun restart() {
         log(LogLevel.INFO, "手动刷新：先关闭 dsh 服务，再重新执行启动流程")
+        prepareSteps(withStop = true)
         showChecking()
         ApplicationManager.getApplication().executeOnPooledThread {
             dsh.stop()
@@ -116,6 +141,11 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
             return
         }
 
+        // 创建 JBCefBrowser 只能在 EDT 上进行，而 JCEF 首次初始化会把 EDT 卡住几秒，
+        // 所以先把"加载界面"这一步同步画出来，否则用户看到的还停在上一步。
+        applyStage(DshCli.Stage.LOADING_UI)
+        paintImmediately(0, 0, width, height)
+
         val existing = browser
         if (existing != null) {
             log(LogLevel.INFO, "复用已有内嵌浏览器，重新加载：$url")
@@ -149,6 +179,7 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
     }
 
     private fun show(card: Card) {
+        if (card != Card.CHECKING) stepTimer.stop()
         (layout as CardLayout).show(this, card.name)
     }
 
@@ -160,10 +191,57 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
         ApplicationManager.getApplication().invokeLater(Runnable { action() })
     }
 
+    // ---- 步骤清单 ----
+
+    /** [DshCli] 与 [showBrowser] 上报阶段进度；可能来自任意线程。 */
+    private fun onStage(stage: DshCli.Stage) = onEdt { applyStage(stage) }
+
+    /** 必须在 EDT 调用。 */
+    private fun applyStage(stage: DshCli.Stage) {
+        if (stage !in stepRows) return
+        runningStage?.let { stepRows[it]?.update(StepState.DONE, null) }
+        runningStage = stage
+        runningSince = System.currentTimeMillis()
+        stepRows[stage]?.update(StepState.RUNNING, elapsedSeconds())
+        if (stage == DshCli.Stage.WAITING_URL) stepTimer.start() else stepTimer.stop()
+    }
+
+    /**
+     * 重建步骤清单。首次打开没有旧服务可关，[withStop] 为 false 时就不渲染那一步。
+     * 必须在 EDT 调用。
+     */
+    private fun prepareSteps(withStop: Boolean) {
+        stepsBox.removeAll()
+        stepRows.clear()
+        DshCli.Stage.entries
+            .filter { withStop || it != DshCli.Stage.STOPPING }
+            .forEach { stage ->
+                val row = StepRow(stageText(stage))
+                row.update(StepState.PENDING, null)
+                row.alignmentX = Component.LEFT_ALIGNMENT
+                stepsBox.add(row)
+                stepRows[stage] = row
+            }
+        runningStage = null
+        stepsBox.revalidate()
+        stepsBox.repaint()
+    }
+
+    private fun stageText(stage: DshCli.Stage): String = when (stage) {
+        DshCli.Stage.STOPPING -> "关闭旧的 dsh 服务"
+        DshCli.Stage.DETECTING -> "检测 dsh 命令"
+        DshCli.Stage.PICKING_PORT -> "选择可用端口"
+        DshCli.Stage.STARTING -> "启动 dsh web 服务"
+        DshCli.Stage.WAITING_URL -> "等待服务输出地址"
+        DshCli.Stage.LOADING_UI -> "加载 Harness 界面"
+    }
+
+    private fun elapsedSeconds(): Int = ((System.currentTimeMillis() - runningSince) / 1000).toInt()
+
     // ---- 卡片构建 ----
 
     private fun buildCheckingCard(): JPanel = JPanel(BorderLayout()).apply {
-        add(JLabel("正在检测 dsh 命令…", JLabel.CENTER), BorderLayout.CENTER)
+        add(stepsBox, BorderLayout.NORTH)
     }
 
     private fun buildGuideCard(): JPanel {
@@ -230,5 +308,35 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
             box.add(component)
         }
         return JPanel(BorderLayout()).apply { add(box, BorderLayout.NORTH) }
+    }
+}
+
+private enum class StepState { DONE, RUNNING, PENDING }
+
+/** CHECKING 卡片里的一行步骤：左侧固定留出图标位，保证三态下文字左边界对齐。 */
+private class StepRow(private val base: String) : JPanel(BorderLayout(6, 0)) {
+
+    private val iconLabel = JLabel().apply {
+        preferredSize = Dimension(JBUI.scale(16), JBUI.scale(16))
+    }
+    private val textLabel = JLabel(base)
+
+    init {
+        isOpaque = false
+        add(iconLabel, BorderLayout.WEST)
+        add(textLabel, BorderLayout.CENTER)
+    }
+
+    fun update(state: StepState, elapsedSeconds: Int?) {
+        iconLabel.icon = if (state == StepState.DONE) AllIcons.Actions.Checked else null
+        textLabel.font = JBUI.Fonts.label()
+            .deriveFont(if (state == StepState.RUNNING) Font.BOLD else Font.PLAIN)
+        textLabel.foreground =
+            if (state == StepState.RUNNING) UIUtil.getLabelForeground() else UIUtil.getContextHelpForeground()
+        textLabel.text = when {
+            state != StepState.RUNNING -> base
+            elapsedSeconds == null -> "$base…"
+            else -> "$base…  已等待 $elapsedSeconds 秒"
+        }
     }
 }

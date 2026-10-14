@@ -13,10 +13,20 @@ import java.util.concurrent.TimeoutException
 /**
  * dsh 命令行工具的封装：检测命令是否可用、启动 dsh web 服务、抓取带 token 的地址、结束后台进程。
  *
- * 本类不依赖任何 UI 类，[log] 回调可从任意线程调用。
+ * 本类不依赖任何 UI 类，[log] 与 [onStage] 回调都可能从任意线程调用。
  * [detect] 与 [startWeb] 都会阻塞，必须在后台线程调用。
  */
-class DshCli(private val log: (LogLevel, String) -> Unit) {
+class DshCli(
+    private val log: (LogLevel, String) -> Unit,
+    private val onStage: (Stage) -> Unit,
+) {
+
+    /**
+     * 启动流程中的阶段，按实际发生顺序声明。UI 用它渲染步骤清单。
+     *
+     * [LOADING_UI] 不由本类上报：它对应"创建并加载内嵌浏览器"，属于界面层的步骤。
+     */
+    enum class Stage { STOPPING, DETECTING, PICKING_PORT, STARTING, WAITING_URL, LOADING_UI }
 
     sealed interface DetectResult {
         data class Available(val version: String) : DetectResult
@@ -32,6 +42,7 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
     private var process: Process? = null
 
     fun detect(): DetectResult {
+        onStage(Stage.DETECTING)
         val startedAt = System.nanoTime()
         val command = listOf("cmd.exe", "/c", DETECT_COMMAND)
         log(LogLevel.INFO, "执行检测命令：${command.joinToString(" ")}")
@@ -66,9 +77,11 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
     }
 
     fun startWeb(): StartResult {
+        onStage(Stage.PICKING_PORT)
         val port = findFreePort()
             ?: return StartResult.Failed("端口 ${PORT_RANGE.first}-${PORT_RANGE.last} 全部被占用")
 
+        onStage(Stage.STARTING)
         val command = listOf(
             "cmd.exe", "/c", "dsh", "web",
             "--host", "127.0.0.1",
@@ -115,6 +128,7 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
         reader.isDaemon = true
         reader.start()
 
+        onStage(Stage.WAITING_URL)
         var failure = "dsh web 启动失败"
         val url = try {
             urlFuture.get(URL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -144,6 +158,8 @@ class DshCli(private val log: (LogLevel, String) -> Unit) {
 
     /** 结束 [startWeb] 拉起的进程树。 */
     fun stop() {
+        // 即使没有存活进程也上报：这样 UI 上"关闭旧服务"那一步不会被永久留在未完成态。
+        onStage(Stage.STOPPING)
         val proc = process ?: return
         process = null
         killTree(proc)

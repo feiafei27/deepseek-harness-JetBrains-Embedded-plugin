@@ -16,6 +16,7 @@ import java.awt.CardLayout
 import java.awt.Component
 import java.awt.Dimension
 import java.awt.Font
+import java.awt.GridBagLayout
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JButton
@@ -240,8 +241,10 @@ class HarnessPanel(private val log: (LogLevel, String) -> Unit) : JPanel(CardLay
 
     // ---- 卡片构建 ----
 
-    private fun buildCheckingCard(): JPanel = JPanel(BorderLayout()).apply {
-        add(stepsBox, BorderLayout.NORTH)
+    // GridBagLayout 不给约束时会把唯一子组件同时按水平和垂直居中；步骤行之间仍靠
+    // stepsBox 的 BoxLayout + LEFT_ALIGNMENT 保持左对齐，所以整体是"居中的一块列表"。
+    private fun buildCheckingCard(): JPanel = JPanel(GridBagLayout()).apply {
+        add(stepsBox)
     }
 
     private fun buildGuideCard(): JPanel {

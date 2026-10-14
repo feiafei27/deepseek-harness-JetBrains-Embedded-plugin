@@ -56,6 +56,13 @@ Search for **DeepSeek Harness Embedded** under `Settings → Plugins → Marketp
 3. If no usable `dsh` is found, the Harness tab shows installation instructions and the hint
    "dsh 命令完成后，点击下方刷新按钮" (once the dsh command is ready, click the refresh button below).
    Install `dsh` as instructed, then click **刷新 (Refresh)** — no IDE restart needed.
+4. At the top right of the window, immediately **left of the "…" (More) button**, there is another
+   **Refresh** button (circular-arrow icon):
+
+   Clicking it reruns the startup flow from scratch — it **stops** the `dsh` service of this window,
+   re-detects and starts it, then reloads the embedded page with the newly reported URL. Use it when
+   the page gets stuck, when you want to reconnect, or right after upgrading or reinstalling `dsh`.
+   No IDE restart is needed here either.
 
 ## Settings
 
